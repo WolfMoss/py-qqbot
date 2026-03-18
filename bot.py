@@ -94,8 +94,9 @@ def main():
 
     intents = botpy.Intents(
         public_guild_messages=True,    # 频道 @ 消息
-        direct_message=True,           # 频道私信
-        guild_messages=True,           # 全量频道消息（需申请）
+        public_messages=True,          # 群/C2C：on_c2c_message_create、on_group_at_message_create 等
+        direct_message=True,           # 频道私信 on_direct_message_create
+        guild_messages=True,           # 全量频道消息（仅私域机器人）
     )
 
     client = QQBot(intents=intents, is_sandbox=settings.SANDBOX)
