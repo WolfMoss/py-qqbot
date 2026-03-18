@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 敏感配置（绝对不要提交！）
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 日志
+*.log
+logs/
+
+# macOS
+.DS_Store
