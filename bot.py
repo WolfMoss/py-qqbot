@@ -11,7 +11,7 @@ from botpy import BotAPI
 from loguru import logger
 
 from config import settings
-from handlers.message_handler import MessageHandler
+from message_handler import MessageHandler
 
 
 class QQBot(botpy.Client):
