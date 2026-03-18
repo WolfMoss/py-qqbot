@@ -75,7 +75,9 @@ class QQBot(botpy.Client):
 
     async def on_direct_message_create(self, message: DirectMessage):
         """频道私信消息"""
-        logger.info(f"[频道私信] 来自 {message.author.username}: {message.content}")
+        logger.info(
+            f"[频道私信] 来自 {getattr(message.author, 'username', None)}: {message.content}"
+        )
         # direct 目前没有明确定义“固定会话用户”的字段映射，这里先保持旧逻辑（不触发 iflow 链接会话）
         reply = await self.message_handler.handle(message.content, source="direct")
         await self.api.post_dms(
