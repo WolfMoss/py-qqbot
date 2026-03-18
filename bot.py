@@ -94,7 +94,6 @@ def main():
         public_guild_messages=True,    # 频道 @ 消息
         direct_message=True,           # 频道私信
         guild_messages=True,           # 全量频道消息（需申请）
-        group_at_messages=True,        # 群聊 @ 消息
     )
 
     client = QQBot(intents=intents, is_sandbox=settings.SANDBOX)
