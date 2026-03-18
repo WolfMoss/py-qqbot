@@ -50,6 +50,7 @@ class MessageHandler:
                 # 没有用户标识则无法保证稳定会话；仍尝试新会话
                 channel_user_id = "unknown"
             message_for_iflow = self._message_for_iflow(content)
+            logger.debug(f"[{source}] 处理url: {message_for_iflow!r}")
             return await self._handle_iflow_link(message_for_iflow, source, channel_user_id)
 
         # 1. 空消息
