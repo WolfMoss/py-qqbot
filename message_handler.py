@@ -49,7 +49,8 @@ class MessageHandler:
             if not channel_user_id:
                 # 没有用户标识则无法保证稳定会话；仍尝试新会话
                 channel_user_id = "unknown"
-            return await self._handle_iflow_link(content, source, channel_user_id)
+            message_for_iflow = self._message_for_iflow(content)
+            return await self._handle_iflow_link(message_for_iflow, source, channel_user_id)
 
         # 1. 空消息
         if not content:
@@ -68,12 +69,45 @@ class MessageHandler:
         prefix = settings.REPLY_PREFIX
         return f"{prefix}收到你的消息：{content}\n\n（提示：可在 handlers/message_handler.py 中接入 LLM 或扩展逻辑）"
 
-    @staticmethod
-    def _is_link_like(content: str) -> bool:
-        """只对 http(s) 链接触发，降低误触发风险。"""
+    # 单行内首个 http(s) URL（到空白为止；去掉常见尾部标点）
+    _URL_IN_LINE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+    @classmethod
+    def _is_link_like(cls, content: str) -> bool:
+        """含 http(s) 即视为可走链接链路；多行分享类由 _message_for_iflow 取第二行链接。"""
         if not content:
             return False
         return ("http://" in content) or ("https://" in content)
+
+    @classmethod
+    def _extract_second_line_url(cls, content: str) -> Optional[str]:
+        """
+        从第二行提取链接。适用于：
+        [分享]标题\\nhttps://...\\n…\\n完整链接\\n来自: ...
+        按需求使用第二行上的 URL（可能为截断链接）。
+        """
+        lines = content.splitlines()
+        if len(lines) < 2:
+            return None
+        second = lines[1].strip()
+        m = cls._URL_IN_LINE.search(second)
+        if not m:
+            return None
+        url = m.group(0).rstrip(").,;，。、]")
+        return url or None
+
+    @classmethod
+    def _message_for_iflow(cls, content: str) -> str:
+        """
+        只发 URL：多行分享类取第二行链接；否则取全文里第一个 http(s) URL；都没有则回退原文。
+        """
+        url2 = cls._extract_second_line_url(content)
+        if url2:
+            return url2
+        m = cls._URL_IN_LINE.search(content)
+        if m:
+            return m.group(0).rstrip(").,;，。、]")
+        return content
 
     async def _handle_iflow_link(
         self,
