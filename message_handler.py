@@ -3,8 +3,13 @@
 在此实现你的 Bot 业务逻辑：回显、AI 接入、指令解析等
 """
 
+import json
 import re
+from typing import Optional
+
+import httpx
 from loguru import logger
+
 from config import settings
 
 
@@ -23,7 +28,12 @@ class MessageHandler:
         "/ping": "🏓 Pong! Bot 在线运行中。",
     }
 
-    async def handle(self, raw_content: str, source: str = "unknown") -> str:
+    async def handle(
+        self,
+        raw_content: str,
+        source: str = "unknown",
+        channel_user_id: Optional[str] = None,
+    ) -> str:
         """
         处理一条消息，返回回复字符串。
 
@@ -33,6 +43,13 @@ class MessageHandler:
         """
         content = self._clean(raw_content)
         logger.debug(f"[{source}] 处理消息: {content!r}")
+
+        # 0. 链接类消息：走 iflow-agent 网关流式对话
+        if self._is_link_like(content):
+            if not channel_user_id:
+                # 没有用户标识则无法保证稳定会话；仍尝试新会话
+                channel_user_id = "unknown"
+            return await self._handle_iflow_link(content, source, channel_user_id)
 
         # 1. 空消息
         if not content:
@@ -50,6 +67,83 @@ class MessageHandler:
         # 4. 默认回显（此处可替换为 LLM 调用）
         prefix = settings.REPLY_PREFIX
         return f"{prefix}收到你的消息：{content}\n\n（提示：可在 handlers/message_handler.py 中接入 LLM 或扩展逻辑）"
+
+    @staticmethod
+    def _is_link_like(content: str) -> bool:
+        """只对 http(s) 链接触发，降低误触发风险。"""
+        if not content:
+            return False
+        return ("http://" in content) or ("https://" in content)
+
+    async def _handle_iflow_link(
+        self,
+        user_text: str,
+        source: str,
+        channel_user_id: str,
+    ) -> str:
+        """
+        调用 iflow-agent：
+        - POST /api/chat 返回 SSE
+        - 拼接所有 assistant_chunk.text 作为最终回复
+        """
+        chat_url = settings.iflow_chat_url()
+
+        payload = {
+            "message": user_text,
+            "channel": source if source else "web",
+            "channel_user_id": channel_user_id,
+        }
+        # 不主动传 session_id：让 iflow-agent 按稳定会话策略处理。
+
+        assistant_text_parts: list[str] = []
+        last_event_type: str | None = None
+
+        timeout = settings.iflow_http_timeout_seconds()
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                # 以流方式读取 SSE
+                resp = await client.post(chat_url, json=payload, headers={"Accept": "text/event-stream"})
+                resp.raise_for_status()
+
+                async for raw_line in resp.aiter_lines():
+                    if not raw_line:
+                        continue
+                    # SSE 只关心 data: 行；其余（例如 event:) 直接忽略
+                    if not raw_line.startswith("data:"):
+                        continue
+                    data_str = raw_line[len("data:"):].strip()
+                    if not data_str:
+                        continue
+
+                    try:
+                        event = json.loads(data_str)
+                    except Exception:
+                        logger.warning("解析 SSE data 失败: %r", data_str)
+                        continue
+
+                    last_event_type = str(event.get("type") or "")
+                    if last_event_type == "assistant_chunk":
+                        text = event.get("text") or ""
+                        if text:
+                            assistant_text_parts.append(str(text))
+                    elif last_event_type == "task_finish":
+                        break
+                    elif last_event_type == "error":
+                        msg = event.get("message") or "iflow-agent error"
+                        return f"链接请求处理中出现错误：{msg}"
+
+        except httpx.TimeoutException:
+            logger.exception("iflow-agent SSE 超时")
+            return "链接请求处理中断（超时），请稍后再试。"
+        except Exception:
+            logger.exception("iflow-agent SSE 调用失败")
+            return "链接请求处理中断（通信失败），请稍后再试。"
+
+        final_text = "".join(assistant_text_parts).strip()
+        if final_text:
+            return final_text
+        # 如果没有拿到 assistant_chunk，给一个可读兜底
+        return "我已收到链接请求，但未能生成回复内容。请再发一次或更换链接。"
 
     # ─────────────────────────────────────────────
 

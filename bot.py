@@ -48,7 +48,11 @@ class QQBot(botpy.Client):
     async def on_c2c_message_create(self, message: GroupMessage):
         """QQ 单聊（好友消息）"""
         logger.info(f"[单聊消息] 来自 {message.author.user_openid}: {message.content}")
-        reply = await self.message_handler.handle(message.content, source="c2c")
+        reply = await self.message_handler.handle(
+            message.content,
+            source="c2c",
+            channel_user_id=str(message.author.user_openid),
+        )
         await message.reply(content=reply)
 
     # ──────────────────────────────────────────────
@@ -58,7 +62,11 @@ class QQBot(botpy.Client):
     async def on_group_at_message_create(self, message: GroupMessage):
         """QQ 群聊中被 @ 时触发"""
         logger.info(f"[群聊@消息] 群组 {message.group_openid}, 用户 {message.author.member_openid}: {message.content}")
-        reply = await self.message_handler.handle(message.content, source="group")
+        reply = await self.message_handler.handle(
+            message.content,
+            source="group",
+            channel_user_id=str(message.author.member_openid),
+        )
         await message.reply(content=reply)
 
     # ──────────────────────────────────────────────
@@ -68,6 +76,7 @@ class QQBot(botpy.Client):
     async def on_direct_message_create(self, message: DirectMessage):
         """频道私信消息"""
         logger.info(f"[频道私信] 来自 {message.author.username}: {message.content}")
+        # direct 目前没有明确定义“固定会话用户”的字段映射，这里先保持旧逻辑（不触发 iflow 链接会话）
         reply = await self.message_handler.handle(message.content, source="direct")
         await self.api.post_dms(
             guild_id=message.guild_id,

@@ -29,5 +29,17 @@ class Settings:
     # ── 日志等级 ─────────────────────────────────
     LOG_LEVEL: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
+    # ── iflow-agent 网关（用于链接类消息对话） ─────────
+    IFLOW_BASE_URL: str = field(default_factory=lambda: os.getenv("IFLOW_BASE_URL", "http://10.10.10.3:8000"))
+    IFLOW_CHAT_TIMEOUT_SECONDS: float = field(
+        default_factory=lambda: float(os.getenv("IFLOW_CHAT_TIMEOUT_SECONDS", "120"))
+    )
+
+    def iflow_chat_url(self) -> str:
+        return self.IFLOW_BASE_URL.rstrip("/") + "/api/chat"
+
+    def iflow_http_timeout_seconds(self) -> float:
+        return float(self.IFLOW_CHAT_TIMEOUT_SECONDS)
+
 
 settings = Settings()
