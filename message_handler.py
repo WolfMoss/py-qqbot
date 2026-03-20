@@ -49,9 +49,9 @@ class MessageHandler:
             if not channel_user_id:
                 # 没有用户标识则无法保证稳定会话；仍尝试新会话
                 channel_user_id = "unknown"
-            message_for_iflow = self._message_for_iflow(content)
-            message_for_iflow = "学习 "+message_for_iflow
-            logger.debug(f"[{source}] 处理url: {message_for_iflow!r}")
+            #message_for_iflow = self._message_for_iflow(content)
+            message_for_iflow = "提取这条消息中的url（可能有多个URL，可以先简单测试是否能正常打开再进行下一步，建议从后往前尝试，如果最后一个url成功则其他url就不用测试了直接用最后一个url），并触发学习链接收集器skill： "+content
+            logger.debug(f"[{source}] 发给iflow-agent的消息: {message_for_iflow!r}")
             return await self._handle_iflow_link(message_for_iflow, source, channel_user_id)
 
         # 1. 空消息
